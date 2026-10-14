@@ -121,8 +121,16 @@ off and sends no customer data.
 
 ### Turning the app off
 
-With **Enabled** off nothing is sent to Zendesk: event functions return before loading any record, and the import doesn't
-start (a running import stops before its next page). **Test connection** still works.
+With **Enabled** off nothing is sent to Zendesk:
+
+- customer sync, order context and ticket functions return before loading any record or getting a token;
+- **Create user fields** says the app is off and doesn't change Zendesk;
+- **Import existing customers** doesn't start. A running import checks the setting before each page and before each job
+  check: the page being sent finishes, then no more Zendesk calls are made and the run fails with the totals so far
+  (users of an unfinished job count as still processing).
+
+**Test connection** still works, so you can check the OAuth client before turning the app back on. It reads the client's
+user and the user field list, and sends no customer data.
 
 ## Settings
 

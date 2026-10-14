@@ -317,6 +317,14 @@ describe("setup-fields", () => {
     expect((await setupFields(request({}, {}, {}).req)).message).toMatch(/^Add the Zendesk subdomain/);
   });
 
+  it("does nothing while the app is disabled", async () => {
+    const fetchMock = mockZendesk({ userFields: { status: 200, body: { user_fields: [] } } });
+    expect(await setupFields(request({}, {}, off).req)).toEqual({
+      message: "The Zendesk app is turned off in its settings. Turn it on to create the user fields.",
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("explains a non-admin client and other errors", async () => {
     mockZendesk({
       userFields: { status: 200, body: { user_fields: [] } },

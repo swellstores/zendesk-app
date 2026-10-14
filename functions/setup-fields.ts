@@ -18,6 +18,11 @@ const titleOf = (key: string) => USER_FIELDS.find((field) => field.key === key)?
 export default async function (req: SwellRequest) {
   const settings = getSettings(await req.swell.settings());
 
+  // creating fields changes the Zendesk account, so it waits until the app is on
+  if (!settings.enabled) {
+    return { message: 'The Zendesk app is turned off in its settings. Turn it on to create the user fields.' };
+  }
+
   const missing = missingSettings(settings);
   if (missing.length) {
     return { message: `Add the ${missing.join(', ')} and save the settings first.` };

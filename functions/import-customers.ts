@@ -138,6 +138,9 @@ export default class ImportCustomers {
           throw new Error(`Import failed on page ${page}. ${job.error} Before failing: ${totalsText(totals)}.`);
         }
         totals = addStats(totals, job);
+        if ('stopped' in job) {
+          throw new Error(`Import stopped: ${job.stopped}. Before stopping: ${totalsText(totals)}.`);
+        }
       }
       lastId = result.last_id;
 
@@ -156,11 +159,17 @@ export default class ImportCustomers {
       await step.sleep(`page ${page} wait ${attempt}`, JOB_WAIT);
       const job = await step.do(`page ${page} result ${attempt}`, RETRIES, async () => {
         const settings = getSettings(await req.swell.settings());
+        // no more Zendesk calls once the app is turned off; the job's users count as still processing
+        if (!settings.enabled) return { stopped: true as const };
         return permanentError(settings, async (): Promise<JobResult> => {
           const ctx = await createContext(settings, req.store?.admin_url);
           return getJobResult(ctx, jobId);
         });
       });
+      if ('stopped' in job) {
+        console.log(`Zendesk: stopped checking job ${jobId}, the app was turned off in its settings`);
+        return { pending: submitted, stopped: 'the app was turned off in its settings' };
+      }
       const error = failed(job);
       if (error || !('done' in job)) {
         return { error: error || 'unexpected job result' };

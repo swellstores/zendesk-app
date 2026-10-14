@@ -261,6 +261,24 @@ describe("import-customers workflow", () => {
     );
   });
 
+  it("stops checking the Zendesk job when the app is turned off", async () => {
+    const fetchMock = mockZendesk({ job: jobReply("working") });
+    const { req, swell } = makeReq([accounts(3)]);
+    // load settings and page 1 see the app on, the first job check sees it off
+    swell.settings
+      .mockResolvedValueOnce({ zendesk: rawSettings })
+      .mockResolvedValueOnce({ zendesk: rawSettings })
+      .mockResolvedValue({ zendesk: { ...rawSettings, enabled: false } });
+    const { step, names } = makeStep();
+
+    await expect(new ImportCustomers().run(req, step)).rejects.toThrow(
+      "Import stopped: the app was turned off in its settings. Before stopping: created 0, updated 0, skipped 0, " +
+        "failed 0, still processing 3.",
+    );
+    expect(names).toEqual(["load settings", "page 1", "page 1 wait 1", "page 1 result 1"]);
+    expect(callsTo(fetchMock, "/api/v2/job_statuses/job_1")).toHaveLength(0);
+  });
+
   it("stops when the secret is removed during the run", async () => {
     const { req, swell } = makeReq([accounts(1)]);
     swell.settings.mockResolvedValueOnce({ zendesk: rawSettings }).mockResolvedValue({ zendesk: { ...rawSettings, client_secret: "" } });

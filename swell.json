@@ -6,6 +6,8 @@
   "version": "1.0.0",
   "permissions": [],
   "support_email": "support@swell.is",
+  "documentation_url": "https://developers.swell.is/app-guides/zendesk",
+  "price_external": true,
   "repository_url": "https://github.com/swellstores/zendesk-app",
   "integrations": [
     "zendesk"
@@ -32,7 +34,7 @@
     {
       "id": "import",
       "title": "Bring in every customer",
-      "description": "Import existing customers and set up the Zendesk user fields in one click.",
+      "description": "Create the Zendesk user fields, then import existing customers from the Actions menu.",
       "image_src": "assets/screenshots/4-import.png"
     }
   ]

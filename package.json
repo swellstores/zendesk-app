@@ -1,10 +1,10 @@
 {
   "description": "Sync customers, order context and tickets to Zendesk",
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "0.12.x",
+    "@cloudflare/vitest-pool-workers": "0.23.x",
     "@swell/app-types": "^1.2.0",
     "typescript": "^5.9.3",
-    "vitest": "3.2.x"
+    "vitest": "5.0.x"
   },
   "name": "zendesk",
   "private": true,

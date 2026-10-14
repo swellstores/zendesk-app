@@ -1,41 +1,41 @@
 {
-  "description": "Sync customers, order context and tickets to Zendesk",
-  "id": "zendesk",
-  "name": "Zendesk",
-  "type": "integration",
-  "version": "1.0.0",
-  "permissions": [],
-  "support_email": "support@swell.is",
-  "documentation_url": "https://developers.swell.is/app-guides/zendesk",
-  "price_external": true,
-  "repository_url": "https://github.com/swellstores/zendesk-app",
-  "integrations": [
-    "zendesk"
-  ],
-  "images": [
-    {
-      "id": "settings",
-      "title": "Connected with an OAuth client",
-      "description": "Enter your Zendesk subdomain and a confidential OAuth client, then test the connection.",
-      "image_src": "assets/screenshots/1-settings.png"
-    },
-    {
-      "id": "customers",
-      "title": "Customers and orders in Zendesk",
-      "description": "Every Swell customer is a Zendesk user, with their order history next to each ticket.",
-      "image_src": "assets/screenshots/2-customers.png"
-    },
-    {
-      "id": "tickets",
-      "title": "Tickets when something goes wrong",
-      "description": "Failed payments, cancellations, refunds and returns open a ticket for the customer.",
-      "image_src": "assets/screenshots/3-tickets.png"
-    },
-    {
-      "id": "import",
-      "title": "Bring in every customer",
-      "description": "Create the Zendesk user fields, then import existing customers from the Actions menu.",
-      "image_src": "assets/screenshots/4-import.png"
-    }
-  ]
+	"description": "Sync customers, order context and tickets to Zendesk",
+	"id": "zendesk",
+	"name": "Zendesk",
+	"type": "integration",
+	"version": "1.0.1",
+	"permissions": [],
+	"support_email": "support@swell.is",
+	"documentation_url": "https://developers.swell.is/app-guides/zendesk",
+	"price_external": true,
+	"repository_url": "https://github.com/swellstores/zendesk-app",
+	"integrations": [
+		"zendesk"
+	],
+	"images": [
+		{
+			"id": "settings",
+			"title": "Connected with an OAuth client",
+			"description": "Enter your Zendesk subdomain and a confidential OAuth client, then test the connection.",
+			"image_src": "assets/screenshots/1-settings.png"
+		},
+		{
+			"id": "customers",
+			"title": "Customers and orders in Zendesk",
+			"description": "Every Swell customer is a Zendesk user, with their order history next to each ticket.",
+			"image_src": "assets/screenshots/2-customers.png"
+		},
+		{
+			"id": "tickets",
+			"title": "Tickets when something goes wrong",
+			"description": "Failed payments, cancellations, refunds and returns open a ticket for the customer.",
+			"image_src": "assets/screenshots/3-tickets.png"
+		},
+		{
+			"id": "import",
+			"title": "Bring in every customer",
+			"description": "Create the Zendesk user fields, then import existing customers from the Actions menu.",
+			"image_src": "assets/screenshots/4-import.png"
+		}
+	]
 }

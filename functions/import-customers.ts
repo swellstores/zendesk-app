@@ -112,8 +112,9 @@ export default class ImportCustomers {
           try {
             return { ...page, job_id: await submitUsers(ctx, users) };
           } catch (err) {
-            // some Zendesk accounts refuse the bulk endpoint even for admins; the single endpoint does the same work
-            if (!(err instanceof ZendeskError && err.status === 403)) throw err;
+            // some Zendesk accounts refuse the bulk endpoint even for admins, and a rejected bulk request would lose the
+            // whole page; the single endpoint does the same work and reports each user
+            if (!(err instanceof ZendeskError && [400, 403, 422].includes(err.status))) throw err;
             console.log(`Zendesk: bulk import refused (${err.detail}), sending ${users.length} users one by one`);
             return { ...page, job_id: null, ...(await upsertEach(ctx, users)) };
           }

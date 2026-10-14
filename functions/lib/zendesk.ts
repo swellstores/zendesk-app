@@ -335,10 +335,11 @@ function formatDay(value: unknown): string {
 }
 
 // "#1042 · complete · 120.00 USD · 2026-10-01"
-export function orderLine(order: any): string {
+// without the status for ticket notes: a retry must send the same body as the first request (Idempotency-Key)
+export function orderLine(order: any, withStatus = true): string {
   return [
     `#${order?.number || order?.id}`,
-    order?.status,
+    withStatus ? order?.status : undefined,
     formatAmount(order?.grand_total, order?.currency),
     formatDay(order?.date_created),
   ]
@@ -367,7 +368,7 @@ export function orderFields(account: any, orders: any[], adminUrl: string, field
     swell_order_count: Number(account?.order_count) || 0,
     swell_total_spent: Number(Number(account?.order_value || 0).toFixed(2)),
     swell_last_order: orders.length ? orderLine(orders[0]) : '',
-    swell_recent_orders: orders.map(orderLine).join('\n'),
+    swell_recent_orders: orders.map((order) => orderLine(order)).join('\n'),
     swell_customer_url: customerUrl(adminUrl, account?.id) || '',
   };
   return Object.fromEntries(Object.entries(values).filter(([key]) => fieldKeys.has(key)));
@@ -471,7 +472,7 @@ export function ticketText(kind: TicketKind, order: any, adminUrl: string, ret?:
     subjects[kind] + '.',
     '',
     `Customer: ${customerName(order?.account)} <${order?.account?.email}>`,
-    `Order: ${orderLine(order)}`,
+    `Order: ${orderLine(order, false)}`,
   ];
   if (kind === 'refunded' && order?.refund_total !== undefined) {
     lines.push(`Refunded: ${formatAmount(order.refund_total, order.currency)}`);
@@ -574,14 +575,15 @@ export function connectionError(err: unknown, settings: ZendeskSettings): string
     }
     if (err.status === 403) {
       return (
-        `Zendesk refused ${err.endpoint || 'the request'} (403 Forbidden). The OAuth client's user needs to be a Zendesk ` +
-        'admin, and the client must allow read and write access. Recreate the client as an admin if needed.'
+        `Zendesk refused ${err.endpoint || 'the request'} (403 Forbidden). Check that the OAuth client belongs to a Zendesk ` +
+        'admin and allows read and write access, and that Zendesk IP restrictions are off (Swell has no fixed IP addresses).'
       );
     }
     if (err.code === 'invalid_scope') {
       return 'Zendesk did not grant the read and write scopes. Check the OAuth client in Admin Center.';
     }
-    if (err.status === 404) {
+    // only the token request tells a wrong subdomain apart; a 404 elsewhere is reported as it is
+    if (err.status === 404 && err.endpoint === 'POST /oauth/tokens') {
       return `No Zendesk account found at ${settings.subdomain}.zendesk.com. Check the Zendesk subdomain.`;
     }
     if (err.retryable) {

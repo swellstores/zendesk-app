@@ -314,6 +314,7 @@ describe("order context", () => {
   it("formats an order line", () => {
     expect(orderLine(makeOrder())).toBe("#1042 · complete · 120.00 USD · 2026-10-01");
     expect(orderLine({ id: "o1", grand_total: "x" })).toBe("#o1 · 0.00");
+    expect(orderLine(makeOrder(), false)).toBe("#1042 · 120.00 USD · 2026-10-01");
   });
 
   it("loads the latest orders of the account", async () => {
@@ -420,7 +421,7 @@ describe("tickets", () => {
         "Payment failed for order #1042.",
         "",
         "Customer: Jane Doe <jane@example.com>",
-        "Order: #1042 · complete · 120.00 USD · 2026-10-01",
+        "Order: #1042 · 120.00 USD · 2026-10-01",
         "",
         "Items:",
         "- 2 × Trail Shirt (Large)",
@@ -431,6 +432,12 @@ describe("tickets", () => {
     });
     expect(ticketText("refunded", makeOrder({ refund_total: 30 }), "").body).toContain("Refunded: 30.00 USD");
     expect(ticketText("canceled", makeOrder(), "").subject).toBe("Order #1042 was canceled");
+  });
+
+  it("sends the same note when the order status changes before a retry", () => {
+    expect(ticketText("canceled", makeOrder({ status: "canceled" }), ADMIN_URL)).toEqual(
+      ticketText("canceled", makeOrder({ status: "complete" }), ADMIN_URL),
+    );
   });
 
   it("lists the returned items and the reason", () => {
@@ -538,8 +545,12 @@ describe("connectionError", () => {
     expect(connectionError(new ZendeskError(400, "unauthorized_client", "x"), settings)).toBe(
       "Zendesk does not allow this client to get tokens with its secret. Set the OAuth client type to Confidential.",
     );
-    expect(connectionError(new ZendeskError(404, undefined, "x"), settings)).toBe(
+    expect(connectionError(new ZendeskError(404, undefined, "x", "POST /oauth/tokens"), settings)).toBe(
       "No Zendesk account found at acme.zendesk.com. Check the Zendesk subdomain.",
+    );
+    // a 404 from another call isn't a wrong subdomain
+    expect(connectionError(new ZendeskError(404, undefined, "Not found", "GET /api/v2/user_fields"), settings)).toBe(
+      "Zendesk request failed: Zendesk 404: Not found (GET /api/v2/user_fields)",
     );
     expect(connectionError(new ZendeskError(0, "network_error", "getaddrinfo ENOTFOUND acme.zendesk.com"), settings)).toBe(
       "acme.zendesk.com could not be reached. Check the Zendesk subdomain.",
@@ -548,8 +559,9 @@ describe("connectionError", () => {
 
   it("explains a refused call and missing scopes", () => {
     expect(connectionError(new ZendeskError(403, "Forbidden", "Forbidden", "POST /api/v2/users/create_or_update_many"), settings)).toBe(
-      "Zendesk refused POST /api/v2/users/create_or_update_many (403 Forbidden). The OAuth client's user needs to be a " +
-        "Zendesk admin, and the client must allow read and write access. Recreate the client as an admin if needed.",
+      "Zendesk refused POST /api/v2/users/create_or_update_many (403 Forbidden). Check that the OAuth client belongs " +
+        "to a Zendesk admin and allows read and write access, and that Zendesk IP restrictions are off (Swell has no " +
+        "fixed IP addresses).",
     );
     expect(connectionError(new ZendeskError(400, "invalid_scope", "x"), settings)).toBe(
       "Zendesk did not grant the read and write scopes. Check the OAuth client in Admin Center.",

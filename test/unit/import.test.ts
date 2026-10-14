@@ -304,14 +304,21 @@ describe("import-customers workflow", () => {
     expect(names).toEqual(["load settings", "page 1"]);
   });
 
+  it("also sends users one by one when Zendesk rejects the bulk request", async () => {
+    const fetchMock = mockZendesk({ bulk: { status: 422, body: { error: "RecordInvalid" } } });
+    expect(await new ImportCustomers().run(makeReq([accounts(2)]).req, makeStep().step)).toMatchObject({ updated: 2 });
+    expect(callsTo(fetchMock, "/api/v2/users/create_or_update")).toHaveLength(2);
+  });
+
   it("fails right away on a permanent Zendesk error, naming the refused call", async () => {
     mockZendesk({ bulk: { status: 403, body: { error: "Forbidden" } }, upsert: { status: 403, body: { error: "Forbidden" } } });
     const { step, names } = makeStep();
 
     await expect(new ImportCustomers().run(makeReq([accounts(2)]).req, step)).rejects.toThrow(
-      "Import failed on page 1. Zendesk refused POST /api/v2/users/create_or_update (403 Forbidden). The OAuth " +
-        "client's user needs to be a Zendesk admin, and the client must allow read and write access. Recreate the client " +
-        "as an admin if needed. Before failing: created 0, updated 0, skipped 0, failed 0, still processing 0.",
+      "Import failed on page 1. Zendesk refused POST /api/v2/users/create_or_update (403 Forbidden). Check that the " +
+        "OAuth client belongs to a Zendesk admin and allows read and write access, and that Zendesk IP restrictions are " +
+        "off (Swell has no fixed IP addresses). Before failing: created 0, updated 0, skipped 0, failed 0, still " +
+        "processing 0.",
     );
     // the step returned instead of throwing, so the workflow didn't retry it
     expect(names).toEqual(["load settings", "page 1"]);

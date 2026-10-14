@@ -113,7 +113,7 @@
     {
       "type": "field_group",
       "label": "Tickets",
-      "description": "Opens a Zendesk ticket for the customer when one of these happens. The ticket starts with an internal note, so the customer isn't emailed.",
+      "description": "Opens a Zendesk ticket for the customer when one of these happens. The ticket starts with an internal note, so the app doesn't email the customer; your Zendesk triggers still apply.",
       "fields": [
         {
           "type": "field_row",

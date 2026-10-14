@@ -33,6 +33,10 @@ export default async function (req: SwellRequest) {
     console.log(`Zendesk: ${event.kind} ticket for order ${data.id} already created`);
     return;
   }
+  if (!order.account?.email) {
+    console.log(`Zendesk: ${event.kind} ticket for order ${data.id} skipped, no customer email`);
+    return;
+  }
 
   try {
     const ctx = await createContext(settings, req.store?.admin_url);

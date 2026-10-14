@@ -191,6 +191,15 @@ describe("order-tickets", () => {
     expect(errorSpy).toHaveBeenCalledWith("Zendesk: order gone not found");
   });
 
+  it("skips orders without a customer email before calling Zendesk", async () => {
+    const fetchMock = mockZendesk();
+    await orderTickets(
+      request({ id: "ord_1", $event: { type: "order.payment_failed" } }, { order: makeOrder({ account: { id: "a" } }) }).req,
+    );
+    await returnTickets(request({ id: "ret_1" }, { order: makeOrder({ account: null }) }).req);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("skips orders that already have the ticket", async () => {
     const fetchMock = mockZendesk();
     const order = makeOrder({ $app: { zendesk: { zendesk_ticket_payment_failed: "https://acme.zendesk.com/agent/tickets/1" } } });

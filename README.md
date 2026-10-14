@@ -69,14 +69,15 @@ With **Show orders on Zendesk users** on, synced users also get these custom use
 - The ticket's requester is the order's customer (name and email; Zendesk finds or creates the user).
 - The first comment is an **internal note** (`public: false`) with the customer, order number, total and date (no status,
   so a retry sends the same body), the refund total for refunds,
-  the return number, reason and notes for returns, the items (only the returned ones for returns) and a link to the order
+  the return number, reason and notes for returns, the items (for returns, only the returned ones when the return lists
+  their order items) and a link to the order
   in the Swell dashboard. The customer isn't emailed by the app; Zendesk triggers that react to new tickets still apply.
 - **Priority**, **Ticket tags** plus a tag for the event (`swell_payment_failed`, `swell_canceled`, `swell_refunded`,
   `swell_return`) and **Group ID** are set from the settings. `external_id` is `swell-<event>-<order or return id>`.
 - The ticket link is saved on the order (`zendesk_ticket_payment_failed`, `zendesk_ticket_canceled`,
   `zendesk_ticket_refunded`) or the return (`zendesk_ticket`) and shown on a **Zendesk** tab. A record that already has the
   link gets no second ticket, and the check runs before any Zendesk call.
-- Orders without a customer email are skipped.
+- Orders without a customer email are skipped, before any Zendesk call.
 
 ### Import existing customers
 
@@ -93,15 +94,16 @@ or updates a Zendesk user for every Swell account with an email, with order cont
   each user as created, updated or failed from the job's results. Users of a job that is still running after that are
   counted as **still processing**; users a finished job doesn't report on are counted as failed. Errors for single users are
   logged.
-- Page and job-check steps are retried up to 5 times with exponential backoff (starting at 30 s) on network errors, HTTP 429
-  and 5xx. Resending a page only repeats the same create-or-update. Other Zendesk errors (e.g. 401) aren't retried:
-  the run fails right away with the same explanation as Test connection and the refused call, e.g.
-  `POST /api/v2/users/create_or_update_many`.
+- Page and job-check steps are retried up to 5 times with exponential backoff (starting at 30 s) on Zendesk network errors,
+  HTTP 429 and 5xx, and on Swell API errors. Resending a page only repeats the same create-or-update. Other Zendesk errors
+  (e.g. 401) aren't retried: the run fails right away with the same explanation as Test connection, which names the refused
+  call for 403 and unexpected errors, e.g. `Zendesk refused POST /api/v2/users/create_or_update (403 Forbidden)`.
 - The run returns and logs the totals: created, updated, skipped (no email), failed and still processing.
 - With **Enabled** or **Sync customer accounts** off, or a connection setting missing, the run doesn't start and fails with
   the reason. Settings are read again at the start of each page: turning the app off during an import lets the current page
   finish, then the run fails with the totals so far.
-- Only flags are stored in the run's step output, never the client secret or an access token.
+- Step output, which Swell keeps with the run, holds only flags, counts, record and job IDs and messages, never the client
+  secret or an access token.
 - The action is hidden while **Sync customer accounts** is off; **Create user fields** is hidden while order context is off.
 
 ### Test connection
@@ -121,7 +123,8 @@ off and sends no customer data.
   network error or 5xx, Zendesk returns the ticket it already created instead of a new one, as long as the request body is
   the same; the note leaves out values that change quickly, such as the order status. Zendesk keeps idempotency keys
   for 2 hours, and the saved ticket link on the order or return prevents duplicates after that.
-- If saving the ticket link fails, the error is logged and the ticket isn't created again by that retry.
+- If saving the ticket link fails, the error is logged and the function still succeeds, so Swell doesn't retry it and no
+  second ticket is requested.
 - Other errors (invalid data, rejected credentials) are logged with `console.error`, with the refused call, and not retried.
 
 ### Turning the app off
@@ -215,8 +218,7 @@ Data stored in Swell (`models/`, shown on a **Zendesk** tab by `content/`):
 ## Limits and known behavior
 
 - **Confidential OAuth client required.** Public clients can't use the client credentials grant.
-- **Admin needed for user fields.** Creating user fields needs a client owned by an admin; syncing and tickets work with
-  any user that can manage end users and create tickets.
+- **Admin needed for user fields.** Creating user fields needs a client owned by a Zendesk admin.
 - **Users are matched by account ID or email.** Zendesk's create-or-update finds an existing user by `external_id` (the
   Swell account ID) or email, so customers who already exist in Zendesk are updated, not duplicated.
 - **Bulk import can be refused.** When Zendesk answers 403, 400 or 422 to `create_or_update_many`, the import falls back to

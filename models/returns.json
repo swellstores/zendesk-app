@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json.swell.store/model.json",
+  "collection": "returns",
+  "description": "Zendesk ticket created for the return",
+  "fields": {
+    "zendesk_ticket": {
+      "type": "string",
+      "description": "Zendesk ticket created for the return request"
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "description": "Sync customers, order context and tickets to Zendesk",
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.12.x",
+    "@swell/app-types": "^1.2.0",
+    "typescript": "^5.9.3",
+    "vitest": "3.2.x"
+  },
+  "name": "zendesk",
+  "private": true,
+  "scripts": {
+    "typecheck": "([ -z \"$(find functions -name '*.ts' 2>/dev/null | head -1)\" ] || tsc --noEmit) && ([ ! -f test/tsconfig.json ] || tsc --build --noEmit test) && ([ ! -f frontend/tsconfig.json ] || tsc --build --noEmit frontend)",
+    "test": "vitest run"
+  },
+  "version": "1.0.0",
+  "workspaces": [
+    "frontend"
+  ],
+  "dependencies": {
+    "libphonenumber-js": "^1.13.15"
+  }
+}

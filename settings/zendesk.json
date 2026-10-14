@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json.swell.store/setting.json",
+  "label": "Zendesk",
+  "description": "Sync customers and their orders to Zendesk users, and open tickets for failed payments, cancellations, refunds and returns. In Zendesk Admin Center → Apps and integrations → APIs → OAuth clients, add a confidential client and copy its identifier and secret.",
+  "actions": [
+    {
+      "id": "test_connection",
+      "label": "Test connection",
+      "function": "test-connection",
+      "loading_label": "Testing…",
+      "hint": "Checks the OAuth client and the Swell user fields in Zendesk"
+    },
+    {
+      "id": "setup_fields",
+      "label": "Create user fields",
+      "function": "setup-fields",
+      "loading_label": "Creating fields…",
+      "hint": "Adds the Swell order fields to Zendesk user profiles",
+      "conditions": {
+        "order_context": {
+          "$ne": false
+        }
+      }
+    },
+    {
+      "id": "import_customers",
+      "label": "Import existing customers",
+      "function": "import-customers",
+      "loading_label": "Starting import…",
+      "hint": "Creates or updates a Zendesk user for every customer account",
+      "conditions": {
+        "sync_customers": {
+          "$ne": false
+        }
+      },
+      "modal": {
+        "title": "Import existing customers",
+        "description": "Creates or updates a Zendesk user for every customer account with an email, using the current settings. Runs in the background; large stores can take several minutes.",
+        "submit_label": "Start import"
+      }
+    }
+  ],
+  "fields": [
+    {
+      "id": "subdomain",
+      "label": "Zendesk subdomain",
+      "type": "short_text",
+      "required": true,
+      "description": "The first part of your Zendesk address, e.g. acme for acme.zendesk.com"
+    },
+    {
+      "type": "field_row",
+      "fields": [
+        {
+          "id": "client_id",
+          "label": "OAuth client identifier",
+          "type": "short_text",
+          "required": true,
+          "admin_span": 2,
+          "description": "The client's Identifier in Zendesk Admin Center → Apps and integrations → APIs → OAuth clients"
+        },
+        {
+          "id": "client_secret",
+          "label": "OAuth client secret",
+          "type": "secret",
+          "required": true,
+          "admin_span": 2,
+          "description": "Shown once when you save a confidential client"
+        }
+      ]
+    },
+    {
+      "id": "enabled",
+      "label": "Enabled",
+      "type": "boolean",
+      "ui": "toggle",
+      "default": true,
+      "description": "Turns off everything the app sends to Zendesk without uninstalling it"
+    },
+    {
+      "type": "field_group",
+      "label": "Customers",
+      "description": "Swell customers become Zendesk users, matched by their Swell account ID and email.",
+      "fields": [
+        {
+          "id": "sync_customers",
+          "label": "Sync customer accounts",
+          "type": "boolean",
+          "ui": "toggle",
+          "default": true,
+          "description": "Creates or updates a Zendesk user when a customer account is created or changed"
+        },
+        {
+          "id": "order_context",
+          "label": "Show orders on Zendesk users",
+          "type": "boolean",
+          "ui": "toggle",
+          "default": true,
+          "description": "Keeps order count, total spent, last order and recent orders on the user. Run Create user fields once."
+        },
+        {
+          "id": "recent_orders",
+          "label": "Recent orders to show",
+          "type": "number",
+          "default": 5,
+          "min": 1,
+          "max": 10,
+          "admin_span": 2,
+          "description": "Number of latest orders in the Recent orders field"
+        }
+      ]
+    },
+    {
+      "type": "field_group",
+      "label": "Tickets",
+      "description": "Opens a Zendesk ticket for the customer when one of these happens. The ticket starts with an internal note, so the customer isn't emailed.",
+      "fields": [
+        {
+          "type": "field_row",
+          "fields": [
+            {
+              "id": "ticket_payment_failed",
+              "label": "Payment failed",
+              "type": "boolean",
+              "ui": "toggle",
+              "default": true,
+              "admin_span": 2
+            },
+            {
+              "id": "ticket_canceled",
+              "label": "Order canceled",
+              "type": "boolean",
+              "ui": "toggle",
+              "default": false,
+              "admin_span": 2
+            }
+          ]
+        },
+        {
+          "type": "field_row",
+          "fields": [
+            {
+              "id": "ticket_refunded",
+              "label": "Order refunded",
+              "type": "boolean",
+              "ui": "toggle",
+              "default": false,
+              "admin_span": 2
+            },
+            {
+              "id": "ticket_return",
+              "label": "Return requested",
+              "type": "boolean",
+              "ui": "toggle",
+              "default": true,
+              "admin_span": 2
+            }
+          ]
+        },
+        {
+          "type": "field_row",
+          "fields": [
+            {
+              "id": "ticket_priority",
+              "label": "Priority",
+              "type": "select",
+              "default": "normal",
+              "admin_span": 2,
+              "options": [
+                {
+                  "label": "Low",
+                  "value": "low"
+                },
+                {
+                  "label": "Normal",
+                  "value": "normal"
+                },
+                {
+                  "label": "High",
+                  "value": "high"
+                },
+                {
+                  "label": "Urgent",
+                  "value": "urgent"
+                }
+              ]
+            },
+            {
+              "id": "ticket_tags",
+              "label": "Ticket tags",
+              "type": "short_text",
+              "default": "swell",
+              "admin_span": 2,
+              "description": "Comma-separated tags added to every ticket, next to one for the event, e.g. swell_payment_failed"
+            }
+          ]
+        },
+        {
+          "id": "ticket_group_id",
+          "label": "Group ID",
+          "type": "short_text",
+          "description": "Zendesk group that gets the tickets. Empty: your default group."
+        }
+      ]
+    }
+  ]
+}

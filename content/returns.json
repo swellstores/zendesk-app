@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json.swell.store/content.json",
+  "collection": "returns",
+  "description": "Zendesk ticket created for the return",
+  "fields": [
+    {
+      "id": "zendesk_ticket",
+      "label": "Zendesk ticket",
+      "type": "url",
+      "readonly": true
+    }
+  ],
+  "views": [
+    {
+      "id": "edit",
+      "tabs": [
+        {
+          "id": "zendesk",
+          "label": "Zendesk",
+          "fields": [{ "id": "zendesk_ticket" }]
+        }
+      ]
+    }
+  ]
+}

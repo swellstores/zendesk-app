@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json.swell.store/content.json",
+  "collection": "orders",
+  "description": "Zendesk tickets created for the order",
+  "fields": [
+    {
+      "id": "zendesk_ticket_payment_failed",
+      "label": "Payment failed ticket",
+      "type": "url",
+      "readonly": true
+    },
+    {
+      "id": "zendesk_ticket_canceled",
+      "label": "Cancellation ticket",
+      "type": "url",
+      "readonly": true
+    },
+    {
+      "id": "zendesk_ticket_refunded",
+      "label": "Refund ticket",
+      "type": "url",
+      "readonly": true
+    }
+  ],
+  "views": [
+    {
+      "id": "edit",
+      "tabs": [
+        {
+          "id": "zendesk",
+          "label": "Zendesk",
+          "fields": [
+            { "id": "zendesk_ticket_payment_failed" },
+            { "id": "zendesk_ticket_canceled" },
+            { "id": "zendesk_ticket_refunded" }
+          ]
+        }
+      ]
+    }
+  ]
+}

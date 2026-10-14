@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.swell.store/model.json",
+  "collection": "orders",
+  "description": "Zendesk tickets created for the order",
+  "fields": {
+    "zendesk_ticket_payment_failed": {
+      "type": "string",
+      "description": "Zendesk ticket created when the payment failed"
+    },
+    "zendesk_ticket_canceled": {
+      "type": "string",
+      "description": "Zendesk ticket created when the order was canceled"
+    },
+    "zendesk_ticket_refunded": {
+      "type": "string",
+      "description": "Zendesk ticket created when the order was refunded"
+    }
+  }
+}

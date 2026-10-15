@@ -20,6 +20,12 @@
       "label": "Refund ticket",
       "type": "url",
       "readonly": true
+    },
+    {
+      "id": "zendesk_ticket_return",
+      "label": "Return ticket",
+      "type": "url",
+      "readonly": true
     }
   ],
   "views": [
@@ -30,9 +36,18 @@
           "id": "zendesk",
           "label": "Zendesk",
           "fields": [
-            { "id": "zendesk_ticket_payment_failed" },
-            { "id": "zendesk_ticket_canceled" },
-            { "id": "zendesk_ticket_refunded" }
+            {
+              "id": "zendesk_ticket_payment_failed"
+            },
+            {
+              "id": "zendesk_ticket_canceled"
+            },
+            {
+              "id": "zendesk_ticket_refunded"
+            },
+            {
+              "id": "zendesk_ticket_return"
+            }
           ]
         }
       ]

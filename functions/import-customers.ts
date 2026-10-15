@@ -4,6 +4,7 @@ import {
   createContext,
   getSettings,
   missingSettings,
+  settingsProblem,
   orderFieldKeys,
   type ZendeskSettings,
 } from './lib/zendesk';
@@ -71,7 +72,12 @@ export default class ImportCustomers {
     // step output is stored with the run, so keep only flags here, never the client secret
     const check = await step.do('load settings', async () => {
       const settings = getSettings(await req.swell.settings());
-      return { enabled: settings.enabled, sync_customers: settings.sync_customers, missing: missingSettings(settings) };
+      return {
+        enabled: settings.enabled,
+        sync_customers: settings.sync_customers,
+        missing: missingSettings(settings),
+        problem: settingsProblem(settings),
+      };
     });
 
     // throw so the run ends as failed instead of completed
@@ -83,6 +89,9 @@ export default class ImportCustomers {
     }
     if (check.missing.length) {
       throw new Error(`Import not started: add the ${check.missing.join(', ')} in Apps → Zendesk.`);
+    }
+    if (check.problem) {
+      throw new Error(`Import not started: ${check.problem}`);
     }
 
     let totals = emptyStats();
@@ -98,6 +107,7 @@ export default class ImportCustomers {
         if (!settings.sync_customers) return { ...empty, stopped: 'Sync customer accounts was turned off' };
         const missing = missingSettings(settings);
         if (missing.length) return { ...empty, stopped: `the ${missing.join(', ')} ${missing.length > 1 ? 'were' : 'was'} removed from the settings` };
+        if (settingsProblem(settings)) return { ...empty, stopped: 'the Zendesk subdomain was changed to one that isn\'t valid' };
 
         const accounts = await fetchAccounts(req.swell, afterId);
         const last_id = accounts[accounts.length - 1]?.id ?? null;

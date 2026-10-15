@@ -231,6 +231,7 @@ describe("return-tickets", () => {
     expect(ticket.body.ticket.subject).toBe("Return requested for order #1042");
     expect(ticket.headers["Idempotency-Key"]).toBe("swell-return-ret_1");
     expect(swell.put.mock.calls[0][0]).toBe("/returns/ret_1");
+    expect(swell.put.mock.calls[1][0]).toBe("/orders/ord_1");
   });
 
   it("does nothing when return tickets or the app are off", async () => {
@@ -266,6 +267,15 @@ describe("test-connection", () => {
     expect(await testConnection(request({}, {}, { subdomain: "acme" }).req)).toEqual({
       message: "Add the OAuth client identifier, OAuth client secret and save the settings first.",
     });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("explains a subdomain that isn't one instead of calling it missing", async () => {
+    const fetchMock = mockZendesk();
+    const { message } = await testConnection(request({}, {}, { ...rawSettings, subdomain: "help.acme.com" }).req);
+    expect(message).toMatch(/^"help\.acme\.com" isn't a Zendesk subdomain\./);
+    const setup = await setupFields(request({}, {}, { ...rawSettings, subdomain: "help.acme.com" }).req);
+    expect(setup.message).toMatch(/^"help\.acme\.com" isn't a Zendesk subdomain\./);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

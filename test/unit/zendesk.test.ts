@@ -23,6 +23,7 @@ import {
   isCustomerChange,
   loadSettings,
   missingSettings,
+  settingsProblem,
   orderFieldKeys,
   orderFields,
   orderLine,
@@ -112,6 +113,7 @@ describe("getSettings", () => {
   it("applies defaults", () => {
     expect(getSettings({ zendesk: rawSettings })).toEqual({
       subdomain: "acme",
+      subdomain_input: "acme",
       client_id: "swell_app",
       client_secret: "zd-secret",
       enabled: true,
@@ -145,6 +147,21 @@ describe("missingSettings / loadSettings", () => {
   it("lists what is missing", () => {
     expect(missingSettings(getSettings({}))).toEqual(["Zendesk subdomain", "OAuth client identifier", "OAuth client secret"]);
     expect(missingSettings(makeSettings())).toEqual([]);
+  });
+
+  it("tells an invalid subdomain from a missing one", () => {
+    const custom = getSettings({ zendesk: { ...rawSettings, subdomain: "help.acme.com" } });
+    expect(missingSettings(custom)).toEqual([]);
+    expect(settingsProblem(custom)).toBe(
+      '"help.acme.com" isn\'t a Zendesk subdomain. Enter the first part of your Zendesk address, e.g. acme for acme.zendesk.com; a custom help-center domain can\'t be used.',
+    );
+    expect(settingsProblem(makeSettings())).toBeNull();
+    expect(settingsProblem(getSettings({}))).toBeNull();
+  });
+
+  it("doesn't load settings with an invalid subdomain", async () => {
+    expect(await loadSettings({ settings: async () => ({ zendesk: { ...rawSettings, subdomain: "help.acme.com" } }) })).toBeNull();
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Zendesk: "help.acme.com" isn\'t a Zendesk subdomain.'));
   });
 
   it("returns settings only when enabled and complete", async () => {
@@ -344,6 +361,13 @@ describe("order context", () => {
     });
     expect(orderFields(makeAccount(), [], ADMIN_URL, new Set(["swell_order_count"]))).toEqual({ swell_order_count: 3 });
   });
+
+  it("leaves the customer link out without the admin URL, so an existing link isn't cleared", () => {
+    // workflow runs (the import) get no admin URL
+    const fields = orderFields(makeAccount(), [], "", allKeys);
+    expect(fields).not.toHaveProperty("swell_customer_url");
+    expect(fields).toMatchObject({ swell_order_count: 3, swell_last_order: "" });
+  });
 });
 
 describe("buildUser / userForAccount", () => {
@@ -477,13 +501,25 @@ describe("tickets", () => {
     });
   });
 
-  it("saves a return ticket on the return", async () => {
+  it("saves a return ticket on the return, and on the order where it's shown", async () => {
     mockZendesk();
     const swell = makeSwell();
     await createTicket(swell, "return", makeOrder(), makeContext(), { ret: makeReturn(), appId: "zendesk_dev" });
     expect(swell.put).toHaveBeenCalledWith("/returns/ret_1", {
       $app: { zendesk_dev: { zendesk_ticket: "https://acme.zendesk.com/agent/tickets/77" } },
     });
+    expect(swell.put).toHaveBeenCalledWith("/orders/ord_1", {
+      $app: { zendesk_dev: { zendesk_ticket_return: "https://acme.zendesk.com/agent/tickets/77" } },
+    });
+  });
+
+  it("still returns the ticket when saving it on the order fails", async () => {
+    mockZendesk();
+    const swell = makeSwell();
+    swell.put.mockResolvedValueOnce({}).mockRejectedValueOnce(new Error("swell down"));
+    const result = await createTicket(swell, "return", makeOrder(), makeContext(), { ret: makeReturn() });
+    expect(result).toEqual({ status: "created", url: "https://acme.zendesk.com/agent/tickets/77" });
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("not saved on orders ord_1"), "swell down");
   });
 
   it("finds the ticket already created for a record", () => {

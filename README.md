@@ -75,8 +75,10 @@ With **Show orders on Zendesk users** on, synced users also get these custom use
 - **Priority**, **Ticket tags** plus a tag for the event (`swell_payment_failed`, `swell_canceled`, `swell_refunded`,
   `swell_return`) and **Group ID** are set from the settings. `external_id` is `swell-<event>-<order or return id>`.
 - The ticket link is saved on the order (`zendesk_ticket_payment_failed`, `zendesk_ticket_canceled`,
-  `zendesk_ticket_refunded`) or the return (`zendesk_ticket`) and shown on a **Zendesk** tab. A record that already has the
-  link gets no second ticket, and the check runs before any Zendesk call.
+  `zendesk_ticket_refunded`) or the return (`zendesk_ticket`). A record that already has the link gets no second ticket,
+  and the check runs before any Zendesk call. Standard returns have no page in the dashboard (they're edited in a dialog
+  on the order, which shows no app fields), so a return's link is also saved on its order (`zendesk_ticket_return`, the
+  latest return) and shown with the other links on the order's **Zendesk** tab. A failed save is logged only.
 - Orders without a customer email are skipped, before any Zendesk call.
 
 ### Import existing customers
@@ -99,6 +101,8 @@ or updates a Zendesk user for every Swell account with an email, with order cont
   (e.g. 401) aren't retried: the run fails right away with the same explanation as Test connection, which names the refused
   call for 403 and unexpected errors, e.g. `Zendesk refused POST /api/v2/users/create_or_update (403 Forbidden)`.
 - The run returns and logs the totals: created, updated, skipped (no email), failed and still processing.
+- Workflow runs don't get the store's admin URL, so imported users are sent without `swell_customer_url`: a link the user
+  already has stays, and new users get it from their next customer or order event.
 - With **Enabled** or **Sync customer accounts** off, or a connection setting missing, the run doesn't start and fails with
   the reason. Settings are read again at the start of each page: turning the app off during an import lets the current page
   finish, then the run fails with the totals so far.
@@ -147,7 +151,7 @@ code. Functions read them with `getSettings` (`functions/lib/zendesk.ts`), which
 
 | Setting                 | Type    | Required | Default  | Description                                                                  |
 | ----------------------- | ------- | -------- | -------- | ---------------------------------------------------------------------------- |
-| `subdomain`             | text    | yes      |          | `acme` for acme.zendesk.com; a full host or URL is accepted too.             |
+| `subdomain`             | text    | yes      |          | `acme` for acme.zendesk.com; a full host or URL is accepted too. A value that isn't a Zendesk subdomain (e.g. a custom help-center domain) is reported as such, not as missing, and nothing is sent. |
 | `client_id`             | text    | yes      |          | The OAuth client's **Identifier**.                                           |
 | `client_secret`         | secret  | yes      |          | The OAuth client's secret (confidential client).                             |
 | `enabled`               | toggle  | no       | on       | Turns off everything the app sends to Zendesk.                               |
@@ -170,14 +174,15 @@ Actions:
 | Create user fields         | `setup-fields.ts` (function)    | order context on               |
 | Import existing customers  | `import-customers.ts` (workflow) | customer sync on              |
 
-Data stored in Swell (`models/`, shown on a **Zendesk** tab by `content/`):
+Data stored in Swell (`models/`; the order fields are shown on the order's **Zendesk** tab by `content/orders.json`):
 
 | Record  | Field                             | Value                    |
 | ------- | --------------------------------- | ------------------------ |
 | orders  | `zendesk_ticket_payment_failed`   | link to the ticket       |
 | orders  | `zendesk_ticket_canceled`         | link to the ticket       |
 | orders  | `zendesk_ticket_refunded`         | link to the ticket       |
-| returns | `zendesk_ticket`                  | link to the ticket       |
+| orders  | `zendesk_ticket_return`           | link to the latest return's ticket |
+| returns | `zendesk_ticket`                  | link to the ticket (prevents a second ticket for the return) |
 
 ## Setup
 
@@ -236,6 +241,7 @@ Data stored in Swell (`models/`, shown on a **Zendesk** tab by `content/`):
 - **Idempotency window.** If Swell retries a ticket event more than 2 hours after a failed request that Zendesk had in fact
   completed, and the ticket link couldn't be saved, a second ticket can be created.
 - **Customer dashboard link.** `swell_customer_url` and the order link in tickets are built from the store's admin URL.
+  Imports don't have it, so they leave `swell_customer_url` as it is.
 
 ## Development
 
@@ -254,8 +260,7 @@ functions/
   lib/import.ts        # account paging, bulk jobs and job results
 models/orders.json     # ticket links on orders ($app.zendesk)
 models/returns.json    # ticket link on returns ($app.zendesk)
-content/orders.json    # Zendesk tab on orders
-content/returns.json   # Zendesk tab on returns
+content/orders.json    # Zendesk tab on orders (including the latest return's ticket)
 settings/zendesk.json  # merchant settings and settings actions
 assets/icon.png        # app icon (official Zendesk mark)
 assets/screenshots/    # listing screenshots, referenced by `images` in swell.json

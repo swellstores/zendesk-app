@@ -21,6 +21,8 @@ export type TicketKind = 'payment_failed' | 'canceled' | 'refunded' | 'return';
 
 export interface ZendeskSettings {
   subdomain: string;
+  // what the merchant entered, kept to tell an invalid subdomain from a missing one
+  subdomain_input: string;
   client_id: string;
   client_secret: string;
   enabled: boolean;
@@ -100,6 +102,7 @@ export function getSettings(all: any): ZendeskSettings {
 
   return {
     subdomain: parseSubdomain(raw.subdomain),
+    subdomain_input: text(raw.subdomain),
     client_id: text(raw.client_id),
     client_secret: text(raw.client_secret),
     enabled: flag(raw.enabled, true),
@@ -116,13 +119,21 @@ export function getSettings(all: any): ZendeskSettings {
   };
 }
 
-// the settings the app needs before it can call Zendesk
+// the settings the app needs before it can call Zendesk; an entered but invalid subdomain is reported by settingsProblem
 export function missingSettings(settings: ZendeskSettings): string[] {
   const missing: string[] = [];
-  if (!settings.subdomain) missing.push('Zendesk subdomain');
+  if (!settings.subdomain && !settings.subdomain_input) missing.push('Zendesk subdomain');
   if (!settings.client_id) missing.push('OAuth client identifier');
   if (!settings.client_secret) missing.push('OAuth client secret');
   return missing;
+}
+
+// a setting that is filled in but can't be used, e.g. a custom help-center domain instead of the Zendesk subdomain
+export function settingsProblem(settings: ZendeskSettings): string | null {
+  if (settings.subdomain_input && !settings.subdomain) {
+    return `"${settings.subdomain_input}" isn't a Zendesk subdomain. Enter the first part of your Zendesk address, e.g. acme for acme.zendesk.com; a custom help-center domain can't be used.`;
+  }
+  return null;
 }
 
 // load settings and check the app can call Zendesk
@@ -134,6 +145,11 @@ export async function loadSettings(swell: Pick<SwellClient, 'settings'>): Promis
   const missing = missingSettings(settings);
   if (missing.length) {
     console.error(`Zendesk: missing ${missing.join(', ')} in app settings`);
+    return null;
+  }
+  const problem = settingsProblem(settings);
+  if (problem) {
+    console.error(`Zendesk: ${problem}`);
     return null;
   }
   return settings;
@@ -369,9 +385,10 @@ export function orderFields(account: any, orders: any[], adminUrl: string, field
     swell_total_spent: Number(Number(account?.order_value || 0).toFixed(2)),
     swell_last_order: orders.length ? orderLine(orders[0]) : '',
     swell_recent_orders: orders.map((order) => orderLine(order)).join('\n'),
-    swell_customer_url: customerUrl(adminUrl, account?.id) || '',
+    // without the admin URL (workflow runs don't get one) the link is left out, so an existing link isn't cleared
+    swell_customer_url: customerUrl(adminUrl, account?.id),
   };
-  return Object.fromEntries(Object.entries(values).filter(([key]) => fieldKeys.has(key)));
+  return Object.fromEntries(Object.entries(values).filter(([key, value]) => fieldKeys.has(key) && value !== undefined));
 }
 
 // Zendesk user for a Swell account; matched by external_id (the account id) or email
@@ -438,6 +455,9 @@ export const TICKET_EVENTS: Record<string, { kind: TicketKind; setting: keyof Ze
   'order.refunded': { kind: 'refunded', setting: 'ticket_refunded' },
   'return.created': { kind: 'return', setting: 'ticket_return' },
 };
+
+// order field with the latest return's ticket, shown on the order's Zendesk tab
+export const RETURN_TICKET_ON_ORDER = 'zendesk_ticket_return';
 
 // field on the Swell record that keeps the ticket link
 export function ticketField(kind: TicketKind): string {
@@ -553,6 +573,14 @@ export async function createTicket(
     await swell.put(`/${collection}/${record.id}`, appValues({ [field]: url }, options.appId));
   } catch (err) {
     console.error(`Zendesk: ticket ${url} not saved on ${collection} ${record.id}:`, err instanceof Error ? err.message : err);
+  }
+  // returns have no page of their own in the dashboard, so the link is also shown on the order's Zendesk tab
+  if (options.ret && order?.id) {
+    try {
+      await swell.put(`/orders/${order.id}`, appValues({ [RETURN_TICKET_ON_ORDER]: url }, options.appId));
+    } catch (err) {
+      console.error(`Zendesk: ticket ${url} not saved on orders ${order.id}:`, err instanceof Error ? err.message : err);
+    }
   }
   console.log(`Zendesk: created ticket ${url} (${kind}) for ${collection} ${record.id}`);
   return { status: 'created', url };

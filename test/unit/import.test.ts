@@ -351,6 +351,23 @@ describe("import-customers workflow", () => {
     expect(callsTo(fetchMock, "/api/v2/users/create_or_update_many")).toHaveLength(0);
   });
 
+  it("doesn't start with an invalid subdomain", async () => {
+    const fetchMock = mockZendesk();
+    await expect(
+      new ImportCustomers().run(makeReq([], { ...rawSettings, subdomain: "help.acme.com" }).req, makeStep().step),
+    ).rejects.toThrow('Import not started: "help.acme.com" isn\'t a Zendesk subdomain.');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("doesn't clear the customer link: workflow runs have no admin URL", async () => {
+    const fetchMock = mockZendesk();
+    const { req } = makeReq([accounts(1)]);
+    (req as any).store = { id: "shop" };
+    await new ImportCustomers().run(req, makeStep().step);
+    const [bulk] = callsTo(fetchMock, "/api/v2/users/create_or_update_many");
+    expect(bulk.body.users[0].user_fields).not.toHaveProperty("swell_customer_url");
+  });
+
   it("keeps the client secret out of step output", async () => {
     mockZendesk();
     const { req } = makeReq([accounts(1)]);
@@ -359,7 +376,7 @@ describe("import-customers workflow", () => {
     await new ImportCustomers().run(req, step);
 
     const outputs = await Promise.all((step.do as any).mock.results.map((r: any) => r.value));
-    expect(outputs[0]).toEqual({ enabled: true, sync_customers: true, missing: [] });
+    expect(outputs[0]).toEqual({ enabled: true, sync_customers: true, missing: [], problem: null });
     const json = JSON.stringify(outputs);
     expect(json).not.toContain(rawSettings.client_secret);
     expect(json).not.toContain("token_1");

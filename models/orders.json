@@ -14,6 +14,10 @@
     "zendesk_ticket_refunded": {
       "type": "string",
       "description": "Zendesk ticket created when the order was refunded"
+    },
+    "zendesk_ticket_return": {
+      "type": "string",
+      "description": "Zendesk ticket of the latest return request (also saved on the return)"
     }
   }
 }

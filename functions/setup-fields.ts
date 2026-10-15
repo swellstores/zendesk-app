@@ -6,6 +6,7 @@ import {
   createUserFields,
   getSettings,
   missingSettings,
+  settingsProblem,
 } from './lib/zendesk';
 
 export const config: SwellConfig = {
@@ -26,6 +27,10 @@ export default async function (req: SwellRequest) {
   const missing = missingSettings(settings);
   if (missing.length) {
     return { message: `Add the ${missing.join(', ')} and save the settings first.` };
+  }
+  const problem = settingsProblem(settings);
+  if (problem) {
+    return { message: problem };
   }
 
   try {

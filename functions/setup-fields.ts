@@ -1,6 +1,7 @@
 import {
   USER_FIELDS,
   ZendeskError,
+  adminUrlOf,
   connectionError,
   createContext,
   createUserFields,
@@ -34,7 +35,7 @@ export default async function (req: SwellRequest) {
   }
 
   try {
-    const ctx = await createContext(settings, req.store?.admin_url);
+    const ctx = await createContext(settings, adminUrlOf(req.store));
     const { created, existing } = await createUserFields(ctx);
     if (!created.length) {
       return { message: 'All Swell user fields already exist in Zendesk.' };

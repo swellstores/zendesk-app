@@ -279,6 +279,23 @@ describe("import-customers workflow", () => {
     expect(callsTo(fetchMock, "/api/v2/job_statuses/job_1")).toHaveLength(0);
   });
 
+  it("stops checking the Zendesk job when the subdomain is changed to an invalid one", async () => {
+    const fetchMock = mockZendesk({ job: jobReply("working") });
+    const { req, swell } = makeReq([accounts(3)]);
+    swell.settings
+      .mockResolvedValueOnce({ zendesk: rawSettings })
+      .mockResolvedValueOnce({ zendesk: rawSettings })
+      .mockResolvedValue({ zendesk: { ...rawSettings, subdomain: "help.acme.com" } });
+    const { step } = makeStep();
+
+    await expect(new ImportCustomers().run(req, step)).rejects.toThrow(
+      "Import stopped: the Zendesk subdomain was changed to one that isn't valid. Before stopping: created 0, updated 0, " +
+        "skipped 0, failed 0, still processing 3.",
+    );
+    expect(callsTo(fetchMock, "/api/v2/job_statuses/job_1")).toHaveLength(0);
+    expect(fetchMock.mock.calls.some(([url]: any) => String(url).startsWith("https://.zendesk.com"))).toBe(false);
+  });
+
   it("stops when the secret is removed during the run", async () => {
     const { req, swell } = makeReq([accounts(1)]);
     swell.settings.mockResolvedValueOnce({ zendesk: rawSettings }).mockResolvedValue({ zendesk: { ...rawSettings, client_secret: "" } });
@@ -359,13 +376,13 @@ describe("import-customers workflow", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("doesn't clear the customer link: workflow runs have no admin URL", async () => {
+  it("links imported users to the customer from the store id: workflow runs have no admin URL", async () => {
     const fetchMock = mockZendesk();
     const { req } = makeReq([accounts(1)]);
     (req as any).store = { id: "shop" };
     await new ImportCustomers().run(req, makeStep().step);
     const [bulk] = callsTo(fetchMock, "/api/v2/users/create_or_update_many");
-    expect(bulk.body.users[0].user_fields).not.toHaveProperty("swell_customer_url");
+    expect(bulk.body.users[0].user_fields.swell_customer_url).toBe(`https://shop.swell.store/admin/customers/${bulk.body.users[0].external_id}`);
   });
 
   it("keeps the client secret out of step output", async () => {

@@ -1,5 +1,6 @@
 import {
   ZendeskError,
+  adminUrlOf,
   connectionError,
   createContext,
   getSettings,
@@ -64,6 +65,15 @@ interface PageResult {
   stopped?: string;
 }
 
+// why a running import must make no more Zendesk calls, or undefined while the app is on and its connection is usable
+function stopReason(settings: ZendeskSettings): string | undefined {
+  if (!settings.enabled) return 'the app was turned off in its settings';
+  const missing = missingSettings(settings);
+  if (missing.length) return `the ${missing.join(', ')} ${missing.length > 1 ? 'were' : 'was'} removed from the settings`;
+  if (settingsProblem(settings)) return "the Zendesk subdomain was changed to one that isn't valid";
+  return undefined;
+}
+
 const totalsText = (t: { created: number; updated: number; skipped: number; failed: number; pending: number }) =>
   `created ${t.created}, updated ${t.updated}, skipped ${t.skipped}, failed ${t.failed}, still processing ${t.pending}`;
 
@@ -103,18 +113,16 @@ export default class ImportCustomers {
         // settings are read in each page so the secret stays out of step output
         const settings = getSettings(await req.swell.settings());
         const empty = { count: 0, last_id: null, skipped: 0, submitted: 0, job_id: null };
-        if (!settings.enabled) return { ...empty, stopped: 'the app was turned off in its settings' };
-        if (!settings.sync_customers) return { ...empty, stopped: 'Sync customer accounts was turned off' };
-        const missing = missingSettings(settings);
-        if (missing.length) return { ...empty, stopped: `the ${missing.join(', ')} ${missing.length > 1 ? 'were' : 'was'} removed from the settings` };
-        if (settingsProblem(settings)) return { ...empty, stopped: 'the Zendesk subdomain was changed to one that isn\'t valid' };
+        if (!settings.sync_customers && settings.enabled) return { ...empty, stopped: 'Sync customer accounts was turned off' };
+        const stopped = stopReason(settings);
+        if (stopped) return { ...empty, stopped };
 
         const accounts = await fetchAccounts(req.swell, afterId);
         const last_id = accounts[accounts.length - 1]?.id ?? null;
         if (!accounts.length) return empty;
 
         return permanentError(settings, async () => {
-          const ctx = await createContext(settings, req.store?.admin_url);
+          const ctx = await createContext(settings, adminUrlOf(req.store));
           const { users, skipped } = await buildUsers(req.swell, accounts, ctx, await orderFieldKeys(ctx));
           const page = { count: accounts.length, last_id, skipped, submitted: users.length };
           if (!users.length) return { ...page, job_id: null };
@@ -170,16 +178,18 @@ export default class ImportCustomers {
       await step.sleep(`page ${page} wait ${attempt}`, JOB_WAIT);
       const job = await step.do(`page ${page} result ${attempt}`, RETRIES, async () => {
         const settings = getSettings(await req.swell.settings());
-        // no more Zendesk calls once the app is turned off; the job's users count as still processing
-        if (!settings.enabled) return { stopped: true as const };
+        // no more Zendesk calls once the app is turned off or its connection settings can't be used; the job's users
+        // count as still processing
+        const stopped = stopReason(settings);
+        if (stopped) return { stopped };
         return permanentError(settings, async (): Promise<JobResult> => {
-          const ctx = await createContext(settings, req.store?.admin_url);
+          const ctx = await createContext(settings, adminUrlOf(req.store));
           return getJobResult(ctx, jobId);
         });
       });
       if ('stopped' in job) {
-        console.log(`Zendesk: stopped checking job ${jobId}, the app was turned off in its settings`);
-        return { pending: submitted, stopped: 'the app was turned off in its settings' };
+        console.log(`Zendesk: stopped checking job ${jobId}, ${job.stopped}`);
+        return { pending: submitted, stopped: job.stopped };
       }
       const error = failed(job);
       if (error || !('done' in job)) {

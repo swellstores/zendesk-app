@@ -1,4 +1,4 @@
-import { TICKET_EVENTS, createContext, createTicket, existingTicket, handleError, loadSettings } from './lib/zendesk';
+import { TICKET_EVENTS, adminUrlOf, createContext, createTicket, existingTicket, handleError, loadSettings } from './lib/zendesk';
 
 export const config: SwellConfig = {
   description: 'Create Zendesk tickets for order events',
@@ -39,7 +39,7 @@ export default async function (req: SwellRequest) {
   }
 
   try {
-    const ctx = await createContext(settings, req.store?.admin_url);
+    const ctx = await createContext(settings, adminUrlOf(req.store));
     const result = await createTicket(swell, event.kind, order, ctx, { appId: req.appId || undefined });
     if (result.status === 'skipped') {
       console.log(`Zendesk: ${event.kind} ticket for order ${data.id} skipped, ${result.reason}`);

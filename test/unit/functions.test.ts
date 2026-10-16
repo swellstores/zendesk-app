@@ -216,13 +216,17 @@ describe("order-tickets", () => {
 });
 
 describe("return-tickets", () => {
-  it("subscribes to new returns", () => {
-    expect(returnConfig.model?.events).toEqual(["return.created"]);
+  const created = { id: "ret_1", $event: { type: "return.created" } };
+  const updated = { id: "ret_1", $event: { type: "return.updated" } };
+  const saved = makeReturn({ $app: { zendesk: { zendesk_ticket: "https://acme.zendesk.com/agent/tickets/1" } } });
+
+  it("subscribes to new and updated returns", () => {
+    expect(returnConfig.model?.events).toEqual(["return.created", "return.updated"]);
   });
 
   it("creates a ticket for the return's order", async () => {
     const fetchMock = mockZendesk();
-    const { req, swell } = request({ id: "ret_1" });
+    const { req, swell } = request(created);
 
     await returnTickets(req);
 
@@ -230,30 +234,56 @@ describe("return-tickets", () => {
     const [ticket] = callsTo(fetchMock, "/api/v2/tickets");
     expect(ticket.body.ticket.subject).toBe("Return requested for order #1042");
     expect(ticket.headers["Idempotency-Key"]).toBe("swell-return-ret_1");
+    expect(ticket.body.ticket.comment.body).toContain(`Swell order: ${ADMIN_URL}/orders/ord_1`);
     expect(swell.put.mock.calls[0][0]).toBe("/returns/ret_1");
     expect(swell.put.mock.calls[1][0]).toBe("/orders/ord_1");
   });
 
   it("does nothing when return tickets or the app are off", async () => {
     const fetchMock = mockZendesk();
-    await returnTickets(request({ id: "ret_1" }, {}, { ...rawSettings, ticket_return: false }).req);
-    await returnTickets(request({ id: "ret_1" }, {}, off).req);
+    for (const settings of [{ ...rawSettings, ticket_return: false }, off]) {
+      const { req, swell } = request(updated, { ret: saved }, settings);
+      await returnTickets(req);
+      expect(swell.put).not.toHaveBeenCalled();
+    }
+    await returnTickets(request(created, {}, off).req);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("logs a missing return or order", async () => {
     mockZendesk();
-    await returnTickets(request({ id: "gone" }, { ret: null }).req);
-    await returnTickets(request({ id: "ret_1" }, { order: null }).req);
+    await returnTickets(request({ ...created, id: "gone" }, { ret: null }).req);
+    await returnTickets(request(created, { order: null }).req);
     expect(errorSpy).toHaveBeenCalledWith("Zendesk: return gone not found or has no order");
     expect(errorSpy).toHaveBeenCalledWith("Zendesk: order ord_1 of return ret_1 not found");
   });
 
-  it("skips returns that already have a ticket", async () => {
+  it("skips returns that already have a ticket, and lists the ticket on the order", async () => {
     const fetchMock = mockZendesk();
-    const ret = makeReturn({ $app: { zendesk: { zendesk_ticket: "https://acme.zendesk.com/agent/tickets/1" } } });
-    await returnTickets(request({ id: "ret_1" }, { ret }).req);
+    const { req, swell } = request(created, { ret: saved });
+    await returnTickets(req);
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(swell.put).toHaveBeenCalledWith("/orders/ord_1", {
+      $app: { zendesk: { zendesk_ticket_return: "R-7: https://acme.zendesk.com/agent/tickets/1" } },
+    });
+  });
+
+  it("copies the ticket of an updated return to the order, e.g. one created by an earlier version, without Zendesk", async () => {
+    const fetchMock = mockZendesk();
+    const { req, swell } = request(updated, { ret: saved });
+    await returnTickets(req);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(swell.put).toHaveBeenCalledWith("/orders/ord_1", {
+      $app: { zendesk: { zendesk_ticket_return: "R-7: https://acme.zendesk.com/agent/tickets/1" } },
+    });
+  });
+
+  it("creates no ticket for an updated return without one", async () => {
+    const fetchMock = mockZendesk();
+    const { req, swell } = request(updated);
+    await returnTickets(req);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(swell.put).not.toHaveBeenCalled();
   });
 });
 

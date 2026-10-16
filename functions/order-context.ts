@@ -1,4 +1,4 @@
-import { createContext, handleError, loadSettings, syncAccount } from './lib/zendesk';
+import { adminUrlOf, createContext, handleError, loadSettings, syncAccount } from './lib/zendesk';
 
 export const config: SwellConfig = {
   description: "Keep the customer's order context on their Zendesk user",
@@ -29,7 +29,7 @@ export default async function (req: SwellRequest) {
   }
 
   try {
-    const ctx = await createContext(settings, req.store?.admin_url);
+    const ctx = await createContext(settings, adminUrlOf(req.store));
     await syncAccount(swell, account, ctx);
   } catch (err) {
     handleError(`order context for order ${data.id}`, err);

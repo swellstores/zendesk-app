@@ -152,6 +152,7 @@ export function makeSwell(records: Record<string, any> = {}, settings: any = raw
       if (path === "/accounts/{id}") return "account" in records ? records.account : makeAccount();
       if (path === "/orders/{id}") return "order" in records ? records.order : makeOrder();
       if (path === "/returns/{id}") return "ret" in records ? records.ret : makeReturn();
+      if (path === "/returns" && query?.where?.order_id) return { results: records.orderReturns ?? ["ret" in records ? records.ret : makeReturn()] };
       if (path === "/accounts") return { results: records.accounts ?? [] };
       return null;
     }),

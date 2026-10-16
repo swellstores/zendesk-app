@@ -260,6 +260,14 @@ export interface ZendeskContext {
   adminUrl: string;
 }
 
+// the store's dashboard address for links in Zendesk. Event functions get the store's address as admin_url (without
+// /admin, so its links open the storefront) and workflows may get none, so it's built from the store id then
+export function adminUrlOf(store?: { id?: string; admin_url?: string } | null): string {
+  const base = (store?.admin_url || (store?.id ? `https://${store.id}.swell.store` : '')).replace(/\/+$/, '');
+  if (!base) return '';
+  return /\/admin$/.test(base) ? base : `${base}/admin`;
+}
+
 export async function createContext(settings: ZendeskSettings, adminUrl = ''): Promise<ZendeskContext> {
   return { settings, token: await getAccessToken(settings), adminUrl: adminUrl.replace(/\/+$/, '') };
 }
@@ -456,7 +464,8 @@ export const TICKET_EVENTS: Record<string, { kind: TicketKind; setting: keyof Ze
   'return.created': { kind: 'return', setting: 'ticket_return' },
 };
 
-// order field with the latest return's ticket, shown on the order's Zendesk tab
+// order field with the tickets of all the order's returns, one "<return number>: <link>" per line, shown on the order's
+// Zendesk tab (returns have no page of their own in the dashboard)
 export const RETURN_TICKET_ON_ORDER = 'zendesk_ticket_return';
 
 // field on the Swell record that keeps the ticket link
@@ -574,16 +583,44 @@ export async function createTicket(
   } catch (err) {
     console.error(`Zendesk: ticket ${url} not saved on ${collection} ${record.id}:`, err instanceof Error ? err.message : err);
   }
-  // returns have no page of their own in the dashboard, so the link is also shown on the order's Zendesk tab
+  // returns have no page of their own in the dashboard, so the order lists its returns' tickets; the new link is
+  // passed in, so it's listed even when saving it on the return failed
   if (options.ret && order?.id) {
-    try {
-      await swell.put(`/orders/${order.id}`, appValues({ [RETURN_TICKET_ON_ORDER]: url }, options.appId));
-    } catch (err) {
-      console.error(`Zendesk: ticket ${url} not saved on orders ${order.id}:`, err instanceof Error ? err.message : err);
-    }
+    await listReturnTickets(swell, order.id, options.appId, { id: record.id, url });
   }
   console.log(`Zendesk: created ticket ${url} (${kind}) for ${collection} ${record.id}`);
   return { status: 'created', url };
+}
+
+// rebuild the order's list of return tickets from all its returns, so every return's ticket is listed whatever order
+// the saves ran in; `added` is a link just created, in case it couldn't be saved on its return. Only Swell is called;
+// a failed save is logged
+export async function listReturnTickets(
+  swell: SwellClient,
+  orderId: string,
+  appId?: string | null,
+  added?: { id: string; url: string },
+): Promise<void> {
+  const app = appId || APP_ID;
+  try {
+    const [returns, order] = await Promise.all([
+      swell.get('/returns', { where: { order_id: orderId }, sort: 'date_created asc', limit: 100 }),
+      swell.get('/orders/{id}', { id: orderId }),
+    ]);
+    const lines = (returns?.results || [])
+      .map((ret: any) => {
+        const url = ret?.$app?.[app]?.zendesk_ticket || (added && ret?.id === added.id ? added.url : undefined);
+        return url ? `${ret.number || ret.id}: ${url}` : null;
+      })
+      .filter(Boolean);
+    const list = lines.join('\n') || null;
+    if (!list || order?.$app?.[app]?.[RETURN_TICKET_ON_ORDER] === list) {
+      return;
+    }
+    await swell.put(`/orders/${orderId}`, appValues({ [RETURN_TICKET_ON_ORDER]: list }, app));
+  } catch (err) {
+    console.error(`Zendesk: return tickets not listed on orders ${orderId}:`, err instanceof Error ? err.message : err);
+  }
 }
 
 // friendly message for Zendesk errors; "try again" only for temporary ones

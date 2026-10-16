@@ -8,7 +8,9 @@ import {
   buildUser,
   connectionError,
   createContext,
+  adminUrlOf,
   createTicket,
+  listReturnTickets,
   createUserFields,
   existingTicket,
   customerName,
@@ -501,25 +503,58 @@ describe("tickets", () => {
     });
   });
 
-  it("saves a return ticket on the return, and on the order where it's shown", async () => {
+  it("saves a return ticket on the return, and lists every return's ticket on the order", async () => {
     mockZendesk();
-    const swell = makeSwell();
+    const earlier = makeReturn({ id: "ret_0", number: "R-6", $app: { zendesk_dev: { zendesk_ticket: "https://acme.zendesk.com/agent/tickets/70" } } });
+    const swell = makeSwell({ orderReturns: [earlier, makeReturn()] });
     await createTicket(swell, "return", makeOrder(), makeContext(), { ret: makeReturn(), appId: "zendesk_dev" });
     expect(swell.put).toHaveBeenCalledWith("/returns/ret_1", {
       $app: { zendesk_dev: { zendesk_ticket: "https://acme.zendesk.com/agent/tickets/77" } },
     });
+    expect(swell.get).toHaveBeenCalledWith("/returns", { where: { order_id: "ord_1" }, sort: "date_created asc", limit: 100 });
     expect(swell.put).toHaveBeenCalledWith("/orders/ord_1", {
-      $app: { zendesk_dev: { zendesk_ticket_return: "https://acme.zendesk.com/agent/tickets/77" } },
+      $app: { zendesk_dev: { zendesk_ticket_return: "R-6: https://acme.zendesk.com/agent/tickets/70\nR-7: https://acme.zendesk.com/agent/tickets/77" } },
     });
   });
 
-  it("still returns the ticket when saving it on the order fails", async () => {
+  it("lists the new ticket on the order even when saving it on the return failed", async () => {
+    mockZendesk();
+    const swell = makeSwell();
+    swell.put.mockRejectedValueOnce(new Error("swell down")).mockResolvedValue({});
+    const result = await createTicket(swell, "return", makeOrder(), makeContext(), { ret: makeReturn() });
+    expect(result).toEqual({ status: "created", url: "https://acme.zendesk.com/agent/tickets/77" });
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("not saved on returns ret_1"), "swell down");
+    expect(swell.put).toHaveBeenLastCalledWith("/orders/ord_1", {
+      $app: { zendesk: { zendesk_ticket_return: "R-7: https://acme.zendesk.com/agent/tickets/77" } },
+    });
+  });
+
+  it("still returns the ticket when listing it on the order fails", async () => {
     mockZendesk();
     const swell = makeSwell();
     swell.put.mockResolvedValueOnce({}).mockRejectedValueOnce(new Error("swell down"));
     const result = await createTicket(swell, "return", makeOrder(), makeContext(), { ret: makeReturn() });
     expect(result).toEqual({ status: "created", url: "https://acme.zendesk.com/agent/tickets/77" });
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("not saved on orders ord_1"), "swell down");
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("return tickets not listed on orders ord_1"), "swell down");
+  });
+
+  it("doesn't write the order's return tickets when they're listed already or there are none", async () => {
+    const saved = makeReturn({ $app: { zendesk: { zendesk_ticket: "https://acme.zendesk.com/agent/tickets/2" } } });
+    const listed = makeOrder({ $app: { zendesk: { zendesk_ticket_return: "R-7: https://acme.zendesk.com/agent/tickets/2" } } });
+    let swell = makeSwell({ orderReturns: [saved], order: listed });
+    await listReturnTickets(swell, "ord_1");
+    expect(swell.put).not.toHaveBeenCalled();
+    swell = makeSwell({ orderReturns: [makeReturn()] });
+    await listReturnTickets(swell, "ord_1");
+    expect(swell.put).not.toHaveBeenCalled();
+  });
+
+  it("builds the dashboard address from the store", () => {
+    expect(adminUrlOf({ id: "shop", admin_url: "https://shop.swell.store" })).toBe("https://shop.swell.store/admin");
+    expect(adminUrlOf({ id: "shop", admin_url: "https://shop.swell.store/admin/" })).toBe("https://shop.swell.store/admin");
+    expect(adminUrlOf({ id: "shop" })).toBe("https://shop.swell.store/admin");
+    expect(adminUrlOf({})).toBe("");
+    expect(adminUrlOf(undefined)).toBe("");
   });
 
   it("finds the ticket already created for a record", () => {

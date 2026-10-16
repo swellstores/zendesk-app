@@ -17,7 +17,7 @@
     },
     "zendesk_ticket_return": {
       "type": "string",
-      "description": "Zendesk ticket of the latest return request (also saved on the return)"
+      "description": "Zendesk tickets of the order's return requests, one \"<return number>: <link>\" per line (each also saved on its return)"
     }
   }
 }

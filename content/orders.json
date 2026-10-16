@@ -23,8 +23,9 @@
     },
     {
       "id": "zendesk_ticket_return",
-      "label": "Return ticket",
-      "type": "url",
+      "label": "Return tickets",
+      "type": "long_text",
+      "description": "One line per return of the order: return number and ticket link",
       "readonly": true
     }
   ],

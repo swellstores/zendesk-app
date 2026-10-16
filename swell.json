@@ -3,7 +3,7 @@
 	"id": "zendesk",
 	"name": "Zendesk",
 	"type": "integration",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"permissions": [],
 	"support_email": "support@swell.is",
 	"documentation_url": "https://developers.swell.is/app-guides/zendesk",

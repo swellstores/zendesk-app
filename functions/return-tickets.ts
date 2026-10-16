@@ -1,4 +1,4 @@
-import { adminUrlOf, createContext, createTicket, existingTicket, handleError, listReturnTickets, loadSettings } from './lib/zendesk';
+import { adminUrlOf, swellEnv, createContext, createTicket, existingTicket, handleError, listReturnTickets, loadSettings } from './lib/zendesk';
 
 export const config: SwellConfig = {
   description: 'Create Zendesk tickets for return requests',
@@ -51,7 +51,7 @@ export default async function (req: SwellRequest) {
   }
 
   try {
-    const ctx = await createContext(settings, adminUrlOf(req.store));
+    const ctx = await createContext(settings, adminUrlOf(req.store, swellEnv(req)));
     const result = await createTicket(swell, 'return', order, ctx, { ret, appId: req.appId || undefined });
     if (result.status === 'skipped') {
       console.log(`Zendesk: return ticket for return ${data.id} skipped, ${result.reason}`);

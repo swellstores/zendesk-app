@@ -1,6 +1,7 @@
 import {
   USER_FIELDS,
   adminUrlOf,
+  swellEnv,
   connectionError,
   createContext,
   getSettings,
@@ -28,7 +29,7 @@ export default async function (req: SwellRequest) {
   }
 
   try {
-    const ctx = await createContext(settings, adminUrlOf(req.store));
+    const ctx = await createContext(settings, adminUrlOf(req.store, swellEnv(req)));
     const me = (await callZendesk(ctx, 'GET', '/api/v2/users/me'))?.user || {};
     const notes = [`Connected to ${settings.subdomain}.zendesk.com as ${me.name || me.email || 'the OAuth client user'} (${me.role || 'unknown role'}).`];
 

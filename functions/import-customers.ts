@@ -21,11 +21,16 @@ import {
   type JobResult,
 } from './lib/import';
 
+// started by the start-import action, which passes the environment (workflows get no Swell-Env header)
 export const config: SwellConfig = {
   kind: 'workflow',
   description: 'Import existing Swell customers into Zendesk',
-  action: true,
 };
+
+// "test" when start-import ran in the test environment; only trusted from a run a function started
+export function runEnv(req: SwellWorkflowRequest): 'test' | null {
+  return req.workflow?.trigger === 'function' && (req.data as any)?.env === 'test' ? 'test' : null;
+}
 
 // how often and how long a page's Zendesk job is checked before it counts as pending
 export const JOB_CHECKS = 12;
@@ -122,7 +127,7 @@ export default class ImportCustomers {
         if (!accounts.length) return empty;
 
         return permanentError(settings, async () => {
-          const ctx = await createContext(settings, adminUrlOf(req.store));
+          const ctx = await createContext(settings, adminUrlOf(req.store, runEnv(req)));
           const { users, skipped } = await buildUsers(req.swell, accounts, ctx, await orderFieldKeys(ctx));
           const page = { count: accounts.length, last_id, skipped, submitted: users.length };
           if (!users.length) return { ...page, job_id: null };
@@ -183,7 +188,7 @@ export default class ImportCustomers {
         const stopped = stopReason(settings);
         if (stopped) return { stopped };
         return permanentError(settings, async (): Promise<JobResult> => {
-          const ctx = await createContext(settings, adminUrlOf(req.store));
+          const ctx = await createContext(settings, adminUrlOf(req.store, runEnv(req)));
           return getJobResult(ctx, jobId);
         });
       });

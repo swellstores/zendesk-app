@@ -44,7 +44,7 @@ With **Show orders on Zendesk users** on, synced users also get these custom use
 | `swell_total_spent`   | decimal  | account `order_value`                                         |
 | `swell_last_order`    | text     | latest order, e.g. `#1042 · complete · 120.00 USD · 2026-10-01` |
 | `swell_recent_orders` | textarea | the latest **Recent orders to show** orders (default 5), one per line |
-| `swell_customer_url`  | text     | `https://<store>.swell.store/admin/customers/<account id>`    |
+| `swell_customer_url`  | text     | `https://<store>.swell.store/admin[/test]/customers/<account id>` |
 
 - **Apps → Zendesk → Actions → Create user fields** (`functions/setup-fields.ts`) creates the fields that don't exist yet
   with `POST /api/v2/user_fields`. It needs an OAuth client that belongs to a Zendesk admin.
@@ -89,8 +89,11 @@ With **Show orders on Zendesk users** on, synced users also get these custom use
 
 ### Import existing customers
 
-**Apps → Zendesk → Actions → Import existing customers** starts the `functions/import-customers.ts` workflow, which creates
-or updates a Zendesk user for every Swell account with an email, with order context when it's on.
+**Apps → Zendesk → Actions → Import existing customers** runs `functions/start-import.ts`, which starts the
+`functions/import-customers.ts` workflow (`workflows.create('import-customers', { env })`) and answers "Import started.
+Follow it in the Workflows tab of the app." The workflow creates or updates a Zendesk user for every Swell account with an
+email, with order context when it's on. The action starts it because workflows get no request headers: it passes the
+environment from its `Swell-Env` header (`env: 'test'` in the test environment, else `null`).
 
 - Accounts are read 100 at a time, oldest first (`id` cursor, `functions/lib/import.ts`). Each page is sent as one
   `POST /api/v2/users/create_or_update_many` job, which Zendesk runs in the background.
@@ -108,7 +111,9 @@ or updates a Zendesk user for every Swell account with an email, with order cont
   call for 403 and unexpected errors, e.g. `Zendesk refused POST /api/v2/users/create_or_update (403 Forbidden)`.
 - The run returns and logs the totals: created, updated, skipped (no email), failed and still processing.
 - Workflow runs may not get the store's admin URL, so the dashboard address is built from the store id
-  (`https://<store>.swell.store/admin`) and imported users get `swell_customer_url` like synced ones.
+  (`https://<store>.swell.store/admin`) and imported users get `swell_customer_url` like synced ones. The environment
+  comes from the run's `env` (only trusted when a function started the run), so imports in the test environment link to
+  `/admin/test`.
 - With **Enabled** or **Sync customer accounts** off, or a connection setting missing, the run doesn't start and fails with
   the reason. Settings are read again at the start of each page and before each job check: turning the app off, removing
   a connection setting or changing the subdomain to an invalid one during an import lets the current page finish, then
@@ -179,7 +184,7 @@ Actions:
 | -------------------------- | ------------------------------- | ------------------------------ |
 | Test connection            | `test-connection.ts` (function) | always                         |
 | Create user fields         | `setup-fields.ts` (function)    | order context on               |
-| Import existing customers  | `import-customers.ts` (workflow) | customer sync on              |
+| Import existing customers  | `start-import.ts` → `import-customers.ts` (workflow) | customer sync on |
 
 Data stored in Swell (`models/`; the order fields are shown on the order's **Zendesk** tab by `content/orders.json`):
 
@@ -249,7 +254,9 @@ Data stored in Swell (`models/`; the order fields are shown on the order's **Zen
   completed, and the ticket link couldn't be saved, a second ticket can be created.
 - **Dashboard links.** `swell_customer_url` and the order link in tickets point to `/admin/...` of the store's admin URL.
   Event functions get the store's address there (without `/admin`, so links opened the storefront in earlier versions), and
-  workflows may get none; then the address is built from the store id. Users and tickets synced earlier keep their old
+  workflows may get none; then the address is built from the store id. In the test environment (the function's
+  `Swell-Env` header is `test`) links go to `/admin/test/...`; the import gets the environment from the action that
+  starts it. Users and tickets synced earlier keep their old
   link until their next sync; tickets aren't changed.
 
 ## Development
@@ -264,6 +271,7 @@ functions/
   return-tickets.ts    # return.created → ticket; return.updated → order's list of return tickets
   test-connection.ts   # settings action: token, client user, user fields
   setup-fields.ts      # settings action: create the Swell user fields
+  start-import.ts      # settings action: starts the import with the environment
   import-customers.ts  # workflow: import all accounts with bulk jobs
   lib/zendesk.ts       # settings, OAuth token, API client, users, user fields, tickets
   lib/import.ts        # account paging, bulk jobs and job results

@@ -11,7 +11,7 @@ import {
   submitUsers,
   upsertEach,
 } from "../../functions/lib/import";
-import ImportCustomers, { JOB_CHECKS, config } from "../../functions/import-customers";
+import ImportCustomers, { JOB_CHECKS, config, runEnv } from "../../functions/import-customers";
 import {
   ADMIN_URL,
   callsTo,
@@ -174,8 +174,26 @@ describe("import-customers workflow", () => {
     return { req, swell };
   }
 
-  it("is a workflow started by an action", () => {
-    expect(config).toMatchObject({ kind: "workflow", action: true });
+  it("is a workflow started by the start-import action", () => {
+    expect(config).toMatchObject({ kind: "workflow" });
+    expect(config).not.toHaveProperty("action");
+  });
+
+  it("takes the test environment only from a run a function started", () => {
+    const run = (trigger: string, data: any) => ({ data, workflow: { trigger } }) as unknown as SwellWorkflowRequest;
+    expect(runEnv(run("function", { env: "test" }))).toBe("test");
+    expect(runEnv(run("function", { env: null }))).toBeNull();
+    expect(runEnv(run("function", { env: "Test" }))).toBeNull();
+    expect(runEnv(run("action", { env: "test" }))).toBeNull();
+  });
+
+  it("links imported users to the test dashboard when started in the test environment", async () => {
+    const fetchMock = mockZendesk();
+    const { req } = makeReq([accounts(1)]);
+    Object.assign(req, { store: { id: "shop" }, data: { env: "test" }, workflow: { trigger: "function" } });
+    await new ImportCustomers().run(req, makeStep().step);
+    const [bulk] = callsTo(fetchMock, "/api/v2/users/create_or_update_many");
+    expect(bulk.body.users[0].user_fields.swell_customer_url).toBe(`https://shop.swell.store/admin/test/customers/${bulk.body.users[0].external_id}`);
   });
 
   it("fails without starting when the app, customer sync or settings are missing", async () => {

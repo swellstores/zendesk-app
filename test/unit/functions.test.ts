@@ -15,6 +15,7 @@ import orderContext, { config as contextConfig } from "../../functions/order-con
 import orderTickets, { config as ticketsConfig } from "../../functions/order-tickets";
 import returnTickets, { config as returnConfig } from "../../functions/return-tickets";
 import testConnection, { config as testConfig } from "../../functions/test-connection";
+import startImport, { config as startConfig } from "../../functions/start-import";
 import setupFields, { config as setupConfig } from "../../functions/setup-fields";
 
 let errorSpy: ReturnType<typeof vi.spyOn>;
@@ -28,9 +29,9 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function request(data: Record<string, any>, records: Record<string, any> = {}, settings: any = rawSettings) {
+function request(data: Record<string, any>, records: Record<string, any> = {}, settings: any = rawSettings, headers?: Record<string, string>) {
   const swell = makeSwell(records, settings);
-  const req = createMockRequest({ data, swell: swell as any, store: { admin_url: ADMIN_URL } as any, appId: "zendesk" });
+  const req = createMockRequest({ data, swell: swell as any, store: { admin_url: ADMIN_URL } as any, appId: "zendesk", headers });
   return { req, swell };
 }
 
@@ -239,6 +240,13 @@ describe("return-tickets", () => {
     expect(swell.put.mock.calls[1][0]).toBe("/orders/ord_1");
   });
 
+  it("links to the test dashboard in the test environment", async () => {
+    const fetchMock = mockZendesk();
+    await returnTickets(request(created, {}, rawSettings, { "Swell-Env": "test" }).req);
+    const [ticket] = callsTo(fetchMock, "/api/v2/tickets");
+    expect(ticket.body.ticket.comment.body).toContain(`Swell order: ${ADMIN_URL}/test/orders/ord_1`);
+  });
+
   it("does nothing when return tickets or the app are off", async () => {
     const fetchMock = mockZendesk();
     for (const settings of [{ ...rawSettings, ticket_return: false }, off]) {
@@ -284,6 +292,19 @@ describe("return-tickets", () => {
     await returnTickets(req);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(swell.put).not.toHaveBeenCalled();
+  });
+});
+
+describe("start-import", () => {
+  it("is a settings action that starts the import with the environment", async () => {
+    expect(startConfig).toMatchObject({ action: true });
+    for (const [headers, env] of [[{ "Swell-Env": "test" }, "test"], [{ "Swell-Env": "live" }, null], [undefined, null]] as const) {
+      const { req, swell } = request({}, {}, rawSettings, headers as any);
+      const create = vi.fn().mockResolvedValue({ id: "wf_1", status: "active" });
+      (swell as any).workflows = { create };
+      expect(await startImport(req)).toEqual({ message: "Import started. Follow it in the Workflows tab of the app." });
+      expect(create).toHaveBeenCalledWith("import-customers", { env });
+    }
   });
 });
 

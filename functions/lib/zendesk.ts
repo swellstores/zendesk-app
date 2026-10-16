@@ -261,11 +261,21 @@ export interface ZendeskContext {
 }
 
 // the store's dashboard address for links in Zendesk. Event functions get the store's address as admin_url (without
-// /admin, so its links open the storefront) and workflows may get none, so it's built from the store id then
-export function adminUrlOf(store?: { id?: string; admin_url?: string } | null): string {
-  const base = (store?.admin_url || (store?.id ? `https://${store.id}.swell.store` : '')).replace(/\/+$/, '');
-  if (!base) return '';
-  return /\/admin$/.test(base) ? base : `${base}/admin`;
+// /admin, so its links open the storefront) and workflows may get none, so it's built from the store id then. Functions
+// get the environment in the Swell-Env header: test records are under /admin/test. Workflows get no headers, so their
+// links point to the live dashboard
+export function adminUrlOf(store?: { id?: string; admin_url?: string } | null, env?: string | null): string {
+  let url = (store?.admin_url || (store?.id ? `https://${store.id}.swell.store` : '')).replace(/\/+$/, '');
+  if (!url) return '';
+  if (env && url.includes(`/admin/${env}`)) url = url.replace(`/admin/${env}`, '/admin');
+  if (!url.includes('/admin')) url = `${url}/admin`;
+  if (env) url = url.replace('/admin', `/admin/${env}`);
+  return url;
+}
+
+// "test" when the function runs in the test environment (its Swell-Env header is exactly "test"), otherwise null
+export function swellEnv(req: { headers?: Headers }): 'test' | null {
+  return req.headers?.get('swell-env') === 'test' ? 'test' : null;
 }
 
 export async function createContext(settings: ZendeskSettings, adminUrl = ''): Promise<ZendeskContext> {

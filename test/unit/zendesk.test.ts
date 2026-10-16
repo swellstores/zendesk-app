@@ -9,6 +9,7 @@ import {
   connectionError,
   createContext,
   adminUrlOf,
+  swellEnv,
   createTicket,
   listReturnTickets,
   createUserFields,
@@ -555,6 +556,19 @@ describe("tickets", () => {
     expect(adminUrlOf({ id: "shop" })).toBe("https://shop.swell.store/admin");
     expect(adminUrlOf({})).toBe("");
     expect(adminUrlOf(undefined)).toBe("");
+  });
+
+  it("adds /test to the dashboard address in the test environment", () => {
+    expect(adminUrlOf({ id: "shop", admin_url: "https://shop.swell.store" }, "test")).toBe("https://shop.swell.store/admin/test");
+    expect(adminUrlOf({ id: "shop", admin_url: "https://shop.swell.store/admin/test" }, "test")).toBe("https://shop.swell.store/admin/test");
+    expect(adminUrlOf({ id: "shop", admin_url: "https://shop.swell.store/admin/test" })).toBe("https://shop.swell.store/admin/test");
+    expect(adminUrlOf({ id: "shop" }, "test")).toBe("https://shop.swell.store/admin/test");
+    expect(adminUrlOf({}, "test")).toBe("");
+    expect(swellEnv({ headers: new Headers({ "Swell-Env": "test" }) })).toBe("test");
+    expect(swellEnv({ headers: new Headers({ "Swell-Env": "Test" }) })).toBeNull();
+    expect(swellEnv({ headers: new Headers({ "Swell-Env": "live" }) })).toBeNull();
+    expect(swellEnv({ headers: new Headers() })).toBeNull();
+    expect(swellEnv({})).toBeNull();
   });
 
   it("finds the ticket already created for a record", () => {

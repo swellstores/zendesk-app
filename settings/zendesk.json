@@ -25,7 +25,7 @@
     {
       "id": "import_customers",
       "label": "Import existing customers",
-      "function": "import-customers",
+      "function": "start-import",
       "loading_label": "Starting import…",
       "hint": "Creates or updates a Zendesk user for every customer account",
       "conditions": {

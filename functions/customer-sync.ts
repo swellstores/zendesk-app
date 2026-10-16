@@ -1,4 +1,4 @@
-import { adminUrlOf, createContext, handleError, isCustomerChange, loadSettings, syncAccount } from './lib/zendesk';
+import { adminUrlOf, swellEnv, createContext, handleError, isCustomerChange, loadSettings, syncAccount } from './lib/zendesk';
 
 export const config: SwellConfig = {
   description: 'Create or update Zendesk users from Swell accounts',
@@ -28,7 +28,7 @@ export default async function (req: SwellRequest) {
   }
 
   try {
-    const ctx = await createContext(settings, adminUrlOf(req.store));
+    const ctx = await createContext(settings, adminUrlOf(req.store, swellEnv(req)));
     await syncAccount(swell, account, ctx);
   } catch (err) {
     handleError(`sync of account ${data.id}`, err);

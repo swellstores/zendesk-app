@@ -7,7 +7,6 @@
 	"permissions": [],
 	"support_email": "support@swell.is",
 	"documentation_url": "https://developers.swell.is/app-guides/zendesk",
-	"price_external": true,
 	"repository_url": "https://github.com/swellstores/zendesk-app",
 	"integrations": [
 		"zendesk"

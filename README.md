@@ -307,3 +307,7 @@ To try it end to end, use a Zendesk trial or sandbox account, set its OAuth clie
 failed or create a return to see a ticket. Function logs: `swell logs --type function`.
 
 Workflows don't run under `swell app dev`; the action always starts the pushed version.
+
+## License
+
+MIT. See [LICENSE](LICENSE). Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).
